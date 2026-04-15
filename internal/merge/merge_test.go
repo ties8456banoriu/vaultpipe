@@ -86,3 +86,18 @@ func TestMerge_StrategyLast_MultipleSources(t *testing.T) {
 		t.Errorf("unexpected result: %v", got)
 	}
 }
+
+// TestMerge_ResultIsIndependent verifies that mutating the result map does not
+// affect the original source maps, ensuring Merge always returns a fresh copy.
+func TestMerge_ResultIsIndependent(t *testing.T) {
+	m := merge.NewMerger(merge.StrategyFirst)
+	src := map[string]string{"KEY": "original"}
+	got, err := m.Merge(src)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	got["KEY"] = "mutated"
+	if src["KEY"] != "original" {
+		t.Errorf("source map was modified; expected 'original', got %q", src["KEY"])
+	}
+}
