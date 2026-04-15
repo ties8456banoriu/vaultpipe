@@ -8,7 +8,8 @@ import (
 	"github.com/your-org/vaultpipe/internal/retry"
 )
 
-// simulateVaultFetch mimics a Vault client that fails twice then succeeds.
+// simulateVaultFetch mimics a Vault client that fails a given number of times
+// before succeeding. The returned function is stateful and tracks call count.
 func simulateVaultFetch(failTimes int) func() error {
 	attempts := 0
 	return func() error {
@@ -56,5 +57,28 @@ func TestRetry_VaultFetch_PermanentFailure(t *testing.T) {
 	err := d.Do(fetch)
 	if err == nil {
 		t.Fatal("expected error on permanent failure")
+	}
+}
+
+// TestRetry_VaultFetch_FirstAttemptSuccess verifies that no unnecessary retries
+// occur when the operation succeeds on the very first attempt.
+func TestRetry_VaultFetch_FirstAttemptSuccess(t *testing.T) {
+	cfg := retry.Config{
+		MaxAttempts: 5,
+		Delay:       time.Millisecond,
+		Multiplier:  1.0,
+	}
+	d := retry.New(cfg)
+
+	calls := 0
+	err := d.Do(func() error {
+		calls++
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("expected immediate success, got: %v", err)
+	}
+	if calls != 1 {
+		t.Fatalf("expected exactly 1 call on immediate success, got %d", calls)
 	}
 }
