@@ -58,6 +58,15 @@ func ParseRules(raw []string) ([]Rule, error) {
 	return rules, nil
 }
 
+// Lookup returns the env key mapped to the given Vault key, falling back to
+// the default upper-snake-case conversion if no explicit rule exists.
+func (m *Mapper) Lookup(vaultKey string) string {
+	if envKey, ok := m.rules[vaultKey]; ok {
+		return envKey
+	}
+	return defaultEnvKey(vaultKey)
+}
+
 // defaultEnvKey converts a vault key to an upper-snake-case env variable name.
 func defaultEnvKey(key string) string {
 	replacer := strings.NewReplacer("-", "_", ".", "_", "/", "_")
