@@ -25,6 +25,12 @@ export VAULT_TOKEN="s.xxxxxxxxxxxxxxxx"
 
 # Pull secrets from a Vault KV path and write to .env
 vaultpipe inject --path secret/data/myapp/dev --output .env
+
+# Preview secrets without writing to disk
+vaultpipe inject --path secret/data/myapp/dev --dry-run
+
+# Append secrets to an existing .env file
+vaultpipe inject --path secret/data/myapp/dev --output .env --append
 ```
 
 **Example `.env` output:**
@@ -38,11 +44,13 @@ API_KEY=abc123
 ### Flags
 
 | Flag | Description | Default |
-|------|-------------|---------|
+|------|-------------|----------|
 | `--path` | Vault KV secret path | *(required)* |
 | `--output` | Output file path | `.env` |
 | `--append` | Append to existing file instead of overwriting | `false` |
 | `--dry-run` | Print secrets to stdout without writing to disk | `false` |
+
+> **Note:** `--dry-run` and `--append` are mutually exclusive. If both are set, `--dry-run` takes precedence.
 
 ---
 
