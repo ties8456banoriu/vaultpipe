@@ -90,3 +90,31 @@ func TestWrite_SortedOutput(t *testing.T) {
 		t.Errorf("expected keys in sorted order, got:\n%s", content)
 	}
 }
+
+func TestWrite_OverwritesExistingFile(t *testing.T) {
+	path := tempEnvFile(t)
+	w := NewWriter(path)
+
+	// Write initial content
+	if err := w.Write(map[string]string{"OLD_KEY": "old_value"}); err != nil {
+		t.Fatalf("unexpected error on first write: %v", err)
+	}
+
+	// Overwrite with new content
+	if err := w.Write(map[string]string{"NEW_KEY": "new_value"}); err != nil {
+		t.Fatalf("unexpected error on second write: %v", err)
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("reading file: %v", err)
+	}
+	content := string(data)
+
+	if strings.Contains(content, "OLD_KEY") {
+		t.Errorf("expected OLD_KEY to be gone after overwrite, got:\n%s", content)
+	}
+	if !strings.Contains(content, "NEW_KEY=new_value") {
+		t.Errorf("expected NEW_KEY=new_value in output, got:\n%s", content)
+	}
+}
