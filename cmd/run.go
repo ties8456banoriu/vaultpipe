@@ -2,16 +2,21 @@ package cmd
 
 import (
 	"fmt"
-	"os"
+	"log"
 
 	"github.com/spf13/cobra"
-	"github.com/yourorg/vaultpipe/internal/config"
-	"github.com/yourorg/vaultpipe/internal/envwriter"
-	"github.com/yourorg/vaultpipe/internal/mapping"
-	"github.com/yourorg/vaultpipe/internal/vault"
+
+	"vaultpipe/internal/audit"
+	"vaultpipe/internal/config"
+	"vaultpipe/internal/envwriter"
+	"vaultpipe/internal/filter"
+	"vaultpipe/internal/mapping"
+	"vaultpipe/internal/vault"
 )
 
-var mapRules []string
+var (
+	filterRules []string
+)
 
 var runCmd = &cobra.Command{
 	Use:   "run",
@@ -20,49 +25,61 @@ var runCmd = &cobra.Command{
 }
 
 func init() {
-	runCmd.Flags().StringArrayVar(&mapRules, "map", []string{}, "Key mapping rules in vault_key=ENV_KEY format")
+	runCmd.Flags().StringArrayVar(&filterRules, "filter", nil, "Include/exclude rules for secret keys (e.g. DB_*, !DB_PASSWORD)")
 	rootCmd.AddCommand(runCmd)
 }
 
 func runRun(cmd *cobra.Command, args []string) error {
 	cfg, err := config.LoadFromEnv()
 	if err != nil {
-		return fmt.Errorf("loading config: %w", err)
+		return fmt.Errorf("config: %w", err)
 	}
 	if err := cfg.Validate(); err != nil {
-		return fmt.Errorf("invalid config: %w", err)
+		return fmt.Errorf("config validation: %w", err)
 	}
 
-	client, err := vault.NewClient(cfg)
+	auditLog, err := audit.NewLogger(cfg.AuditLogPath)
 	if err != nil {
-		return fmt.Errorf("creating vault client: %w", err)
+		return fmt.Errorf("audit logger: %w", err)
+	}
+	defer auditLog.Close()
+
+	client, err := vault.NewClient(cfg.VaultAddr, cfg.VaultToken)
+	if err != nil {
+		return fmt.Errorf("vault client: %w", err)
 	}
 
 	secrets, err := client.GetSecret(cfg.SecretPath)
 	if err != nil {
-		return fmt.Errorf("fetching secret %q: %w", cfg.SecretPath, err)
+		return fmt.Errorf("vault fetch: %w", err)
+	}
+	auditLog.LogSecretFetched(cfg.SecretPath, len(secrets))
+
+	if len(filterRules) > 0 {
+		rules, err := filter.ParseRules(filterRules)
+		if err != nil {
+			return fmt.Errorf("filter rules: %w", err)
+		}
+		f := filter.NewFilter(rules)
+		secrets, err = f.Apply(secrets)
+		if err != nil {
+			return fmt.Errorf("filter apply: %w", err)
+		}
+		log.Printf("filter: %d keys after filtering", len(secrets))
 	}
 
-	rules, err := mapping.ParseRules(mapRules)
-	if err != nil {
-		return fmt.Errorf("parsing map rules: %w", err)
-	}
-
-	mapper := mapping.NewMapper(rules)
+	mapper := mapping.NewMapper(cfg.MappingRules)
 	mapped, err := mapper.Apply(secrets)
 	if err != nil {
-		return fmt.Errorf("applying mappings: %w", err)
+		return fmt.Errorf("mapping: %w", err)
 	}
 
-	w, err := envwriter.NewWriter(cfg.OutputFile)
-	if err != nil {
-		return fmt.Errorf("creating env writer: %w", err)
+	writer := envwriter.NewWriter(cfg.EnvFilePath)
+	if err := writer.Write(mapped); err != nil {
+		return fmt.Errorf("env write: %w", err)
 	}
+	auditLog.LogEnvWritten(cfg.EnvFilePath, len(mapped))
 
-	if err := w.Write(mapped); err != nil {
-		return fmt.Errorf("writing .env file: %w", err)
-	}
-
-	fmt.Fprintf(os.Stdout, "vaultpipe: wrote %d secrets to %s\n", len(mapped), cfg.OutputFile)
+	fmt.Printf("vaultpipe: wrote %d secrets to %s\n", len(mapped), cfg.EnvFilePath)
 	return nil
 }
