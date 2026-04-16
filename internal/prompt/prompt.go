@@ -26,21 +26,8 @@ func New(in io.Reader, out io.Writer) *Prompter {
 	return &Prompter{in: in, out: out}
 }
 
-// Choose displays a numbered list of options and returns the chosen item.
-// Returns ErrCancelled if the user types 'q' or 'quit'.
-// Returns ErrNoSelection if the input is empty.
-func (p *Prompter) Choose(label string, options []string) (string, error) {
-	if len(options) == 0 {
-		return "", errors.New("prompt: no options provided")
-	}
-
-	fmt.Fprintf(p.out, "%s\n", label)
-	for i, opt := range options {
-		fmt.Fprintf(p.out, "  [%d] %s\n", i+1, opt)
-	}
-	fmt.Fprintf(p.out, "Enter number (or 'q' to cancel): ")
-
-	var raw string
+// readLine reads a single line of input from the Prompter's reader.
+func (p *Prompter) readLine() (string, error) {
 	buf := new(strings.Builder)
 	tmp := make([]byte, 1)
 	for {
@@ -58,7 +45,27 @@ func (p *Prompter) Choose(label string, options []string) (string, error) {
 			return "", fmt.Errorf("prompt: read error: %w", err)
 		}
 	}
-	raw = strings.TrimSpace(buf.String())
+	return strings.TrimSpace(buf.String()), nil
+}
+
+// Choose displays a numbered list of options and returns the chosen item.
+// Returns ErrCancelled if the user types 'q' or 'quit'.
+// Returns ErrNoSelection if the input is empty.
+func (p *Prompter) Choose(label string, options []string) (string, error) {
+	if len(options) == 0 {
+		return "", errors.New("prompt: no options provided")
+	}
+
+	fmt.Fprintf(p.out, "%s\n", label)
+	for i, opt := range options {
+		fmt.Fprintf(p.out, "  [%d] %s\n", i+1, opt)
+	}
+	fmt.Fprintf(p.out, "Enter number (or 'q' to cancel): ")
+
+	raw, err := p.readLine()
+	if err != nil {
+		return "", err
+	}
 
 	if raw == "" {
 		return "", ErrNoSelection
@@ -78,23 +85,9 @@ func (p *Prompter) Choose(label string, options []string) (string, error) {
 func (p *Prompter) Confirm(question string) (bool, error) {
 	fmt.Fprintf(p.out, "%s [y/N]: ", question)
 
-	buf := new(strings.Builder)
-	tmp := make([]byte, 1)
-	for {
-		n, err := p.in.Read(tmp)
-		if n > 0 {
-			if tmp[0] == '\n' {
-				break
-			}
-			buf.WriteByte(tmp[0])
-		}
-		if err != nil {
-			if errors.Is(err, io.EOF) {
-				break
-			}
-			return false, fmt.Errorf("prompt: read error: %w", err)
-		}
+	answer, err := p.readLine()
+	if err != nil {
+		return false, err
 	}
-	answer := strings.TrimSpace(strings.ToLower(buf.String()))
-	return answer == "y" || answer == "yes", nil
+	return strings.ToLower(answer) == "y" || strings.ToLower(answer) == "yes", nil
 }
