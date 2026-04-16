@@ -84,3 +84,19 @@ func TestNew_ZeroDuration_UsesDefault(t *testing.T) {
 		t.Errorf("expected A=1, got %q", secrets["A"])
 	}
 }
+
+func TestDo_FetchReturnsErrorAfterDeadline_ReturnsErrDeadlineExceeded(t *testing.T) {
+	// When both the deadline is exceeded and the fetch returns an error,
+	// ErrDeadlineExceeded should take precedence.
+	d := timeout.New(50 * time.Millisecond)
+	fetchErr := errors.New("fetch failed")
+
+	_, err := d.Do(context.Background(), func(ctx context.Context) (map[string]string, error) {
+		time.Sleep(200 * time.Millisecond)
+		return nil, fetchErr
+	})
+
+	if !errors.Is(err, timeout.ErrDeadlineExceeded) {
+		t.Errorf("expected ErrDeadlineExceeded, got %v", err)
+	}
+}
