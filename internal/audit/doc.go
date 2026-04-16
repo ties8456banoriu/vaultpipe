@@ -9,4 +9,10 @@
 //
 // Events are written to stderr by default so they remain separate from normal
 // program output, but any io.Writer can be supplied via NewLogger.
+//
+// Supported event types:
+//
+//	- "secret_fetch"  – a secret was retrieved from Vault
+//	- "env_write"     – a .env file was written with fetched secrets
+//	- "secret_error"  – an error occurred while fetching a secret
 package audit
