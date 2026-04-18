@@ -31,6 +31,9 @@ vaultpipe inject --path secret/data/myapp/dev --dry-run
 
 # Append secrets to an existing .env file
 vaultpipe inject --path secret/data/myapp/dev --output .env --append
+
+# Use a specific Vault namespace (Vault Enterprise)
+vaultpipe inject --path secret/data/myapp/dev --output .env --namespace my-team
 ```
 
 **Example `.env` output:**
@@ -49,6 +52,7 @@ API_KEY=abc123
 | `--output` | Output file path | `.env` |
 | `--append` | Append to existing file instead of overwriting | `false` |
 | `--dry-run` | Print secrets to stdout without writing to disk | `false` |
+| `--namespace` | Vault namespace (Vault Enterprise only) | *(none)* |
 
 > **Note:** `--dry-run` and `--append` are mutually exclusive. If both are set, `--dry-run` takes precedence.
 
