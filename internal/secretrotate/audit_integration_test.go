@@ -32,14 +32,21 @@ func TestRotate_AuditOnRecord(t *testing.T) {
 		Details: map[string]any{"version": rec.Version, "policy": string(rec.Policy)},
 	})
 
-	var entry map[string]any
-	if err := json.NewDecoder(&buf).Decode(&entry); err != nil {
-		t.Fatalf("decode audit log: %v", err)
-	}
+	entry := decodeAuditEntry(t, &buf)
 	if entry["action"] != "secret_rotated" {
 		t.Errorf("expected action secret_rotated, got %v", entry["action"])
 	}
 	if entry["env_key"] != "API_KEY" {
 		t.Errorf("expected env_key API_KEY, got %v", entry["env_key"])
 	}
+}
+
+// decodeAuditEntry decodes a single JSON audit log entry from buf.
+func decodeAuditEntry(t *testing.T, buf *bytes.Buffer) map[string]any {
+	t.Helper()
+	var entry map[string]any
+	if err := json.NewDecoder(buf).Decode(&entry); err != nil {
+		t.Fatalf("decode audit log: %v", err)
+	}
+	return entry
 }
